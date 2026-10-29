@@ -11,7 +11,7 @@ import com.rfsentinel.app.BuildConfig
 object AboutDialog {
     fun show(activity: AppCompatActivity) {
         val html = """
-            <b>RF Sentinel ${BuildConfig.VERSION_NAME}</b><br/>
+            <b>RF Sentinel ${com.rfsentinel.app.util.BuildIdentity.label}</b><br/>
             Copyright &copy; 2026 CIS-C0. Free software under the GNU General Public
             License v3.0: you may share and modify it under its terms. It comes with
             ABSOLUTELY NO WARRANTY. Source code: github.com/CIS-C0/RFSentinel<br/><br/>

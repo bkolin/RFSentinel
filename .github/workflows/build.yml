@@ -1,0 +1,32 @@
+# Builds the FOSS flavor and runs the JVM unit tests and lint on every push and pull request.
+# FOSS only: no Mapbox token or non-free firmware is needed, so forks get the same result.
+name: Build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the commit hash goes into the version label
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Test, lint and build
+        run: sh ./gradlew -Prfs.foss=true testFossDebugUnitTest lintFossDebug assembleFossDebug --console=plain
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports
+          path: app/build/reports/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-foss-debug
+          path: app/build/outputs/apk/foss/debug/*.apk

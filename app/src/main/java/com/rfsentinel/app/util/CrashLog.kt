@@ -39,7 +39,7 @@ object CrashLog {
         val trace = StringWriter().also { error.printStackTrace(PrintWriter(it)) }.toString()
         val entry = buildString {
             append("==== ").append(SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.US).format(Date())).append(" ====\n")
-            append("RF Sentinel ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})${if (BuildConfig.DEBUG) " debug" else ""}\n")
+            append("RF Sentinel ${BuildIdentity.label} (${BuildConfig.VERSION_CODE})${if (BuildConfig.DEBUG) " debug" else ""}\n")
             append("${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})\n")
             append("Thread: ${thread.name}\n")
             append(trace).append("\n")

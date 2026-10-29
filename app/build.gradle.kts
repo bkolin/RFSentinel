@@ -25,6 +25,16 @@ val mapboxToken: String = Properties().run {
     getProperty("MAPBOX_ACCESS_TOKEN", "").trim()
 }
 
+// Short commit of the source, shown next to the version ("2.31.0 · 83a431d") so a report names the exact build.
+// Empty when built outside a git checkout (e.g. a source tarball); "+" marks uncommitted changes.
+val gitSha: String = runCatching {
+    val sha = providers.exec { commandLine("git", "rev-parse", "--short=7", "HEAD"); isIgnoreExitValue = true }
+        .standardOutput.asText.get().trim()
+    val dirty = providers.exec { commandLine("git", "status", "--porcelain", "--untracked-files=no"); isIgnoreExitValue = true }
+        .standardOutput.asText.get().isNotBlank()
+    if (sha.matches(Regex("[0-9a-f]{7}"))) sha + if (dirty) "+" else "" else ""
+}.getOrDefault("")
+
 // True for a FOSS-only build (see settings.gradle.kts): no full flavor, no Mapbox SDK, no Mapbox server.
 val fossOnly = (gradle as ExtensionAware).extra["fossOnly"] as Boolean
 
@@ -41,6 +51,7 @@ android {
         targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
+        buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

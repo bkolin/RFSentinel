@@ -295,7 +295,7 @@ object DeviceActions {
             setTextIsSelectable(true)
         }
         fun report() = SignatureReport.build(advert, snap.vendor, snap.deviceType, MacUtil.isRandomized(mac),
-            note.text.toString(), BuildConfig.VERSION_NAME)
+            note.text.toString(), com.rfsentinel.app.util.BuildIdentity.label)
         preview.text = report()
         val box = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL

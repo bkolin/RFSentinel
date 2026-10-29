@@ -202,7 +202,7 @@ object UsbWifi {
         val app = context.applicationContext
         val sb = StringBuilder()
         sb.append("RF Sentinel - USB WiFi adapter log\n")
-        sb.append("App ${com.rfsentinel.app.BuildConfig.VERSION_NAME} (${com.rfsentinel.app.BuildConfig.VERSION_CODE})")
+        sb.append("App ${com.rfsentinel.app.util.BuildIdentity.label} (${com.rfsentinel.app.BuildConfig.VERSION_CODE})")
             .append(if (com.rfsentinel.app.BuildConfig.DEBUG) " debug\n" else "\n")
         sb.append("Phone ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}, Android ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})\n")
         sb.append("Exported ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())}\n")
