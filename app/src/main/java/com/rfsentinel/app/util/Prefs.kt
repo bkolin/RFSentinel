@@ -490,6 +490,13 @@ object Prefs {
     fun radarBeep(context: Context): Boolean = bool(context, "radar_beep", false)
     fun setRadarBeep(context: Context, value: Boolean) = setBool(context, "radar_beep", value)
 
+    /**
+     * Open in the Tactical view ([com.rfsentinel.app.ui.TacticalActivity]): on by default in this build. "Classic view"
+     * there goes back to the main screen for the session; the main menu turns this off for good.
+     */
+    fun tacticalView(context: Context): Boolean = bool(context, "tactical_view", true)
+    fun setTacticalView(context: Context, value: Boolean) = setBool(context, "tactical_view", value)
+
     /** The radar's angle layout: false = spread by address, true = rising signals at the top ([com.rfsentinel.app.ui.RadarModel]). */
     fun radarApproach(context: Context): Boolean = bool(context, "radar_approach", false)
     fun setRadarApproach(context: Context, value: Boolean) = setBool(context, "radar_approach", value)

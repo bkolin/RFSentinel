@@ -290,6 +290,10 @@ class MainActivity : AppCompatActivity() {
             if (f != filter) filterChips[f]?.let { it.isChecked = true; scrollToChip(it) }
         }
         updateStatus()
+        // The Tactical view opens over this screen unless it is switched off or Classic view was picked this session.
+        if (Prefs.onboardingDone(this) && Prefs.tacticalView(this) && !com.rfsentinel.app.ui.TacticalActivity.dismissed) {
+            com.rfsentinel.app.ui.TacticalActivity.open(this)
+        }
         // Every time the app comes to the front (this screen can stay alive for days): Settings > Check for updates on app open.
         // The FOSS build first asks whether it may fetch the known cameras on its own.
         if (Prefs.onboardingDone(this)) com.rfsentinel.app.util.CameraQuestion.askIfNeeded(this) {
@@ -1154,6 +1158,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         val wazeOn = com.rfsentinel.app.ui.WazeUi.on(this)
+        menu.findItem(R.id.action_tactical_start)?.isChecked = Prefs.tacticalView(this)
         menu.findItem(R.id.action_waze_now)?.isVisible = wazeOn
         menu.findItem(R.id.action_waze_status)?.isVisible = wazeOn
         val muted = Prefs.alertsMuted(this)
@@ -1318,6 +1323,8 @@ class MainActivity : AppCompatActivity() {
             R.id.action_device_history -> { startActivity(Intent(this, com.rfsentinel.app.ui.DeviceHistoryActivity::class.java)); true }
             R.id.action_match_log -> { startActivity(Intent(this, DetectionLogActivity::class.java)); true }
             R.id.action_settings -> { startActivity(Intent(this, SettingsActivity::class.java)); true }
+            R.id.action_tactical -> { com.rfsentinel.app.ui.TacticalActivity.open(this); true }
+            R.id.action_tactical_start -> { Prefs.setTacticalView(this, !Prefs.tacticalView(this)); invalidateOptionsMenu(); true }
             R.id.action_probes -> { startActivity(Intent(this, com.rfsentinel.app.probes.ProbeListActivity::class.java)); true }
             R.id.action_export -> { Exporter.showExportMenu(this); true }
             R.id.action_traces -> { startActivity(Intent(this, com.rfsentinel.app.ui.TripsActivity::class.java)); true }

@@ -17,6 +17,8 @@
         android:icon="@drawable/ic_settings"
         android:title="Settings"
         app:showAsAction="always" />
+    <item android:id="@+id/action_tactical" android:title="Tactical view" app:showAsAction="never" />
+    <item android:id="@+id/action_tactical_start" android:title="Start in Tactical view" android:checkable="true" app:showAsAction="never" />
     <item android:id="@+id/action_waze_now" android:title="Check Waze now" app:showAsAction="never" />
     <item android:id="@+id/action_waze_status" android:title="Waze status" app:showAsAction="never" />
     <!-- Everything the app remembers, in one place. -->

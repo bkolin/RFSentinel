@@ -33,6 +33,8 @@ object DeviceRegistry {
     /** Devices not heard from for this long drop off the live list. */
     const val PRUNE_AFTER_MS = 3 * 60 * 1000L
     private const val HISTORY_MAX = 600
+    /** Readings in a light snapshot ([recentHistory]). */
+    private const val RECENT_MAX = 40
     private const val HISTORY_MIN_SPACING_MS = 1000L
     private const val LOCATION_SPACING_MS = 45_000L
     private const val ROTATION_SILENCE_MS = 1_500L
@@ -460,6 +462,19 @@ object DeviceRegistry {
 
     fun clear() = tracks.clear()
 
+    /** The readings of the radar's window ([com.rfsentinel.app.ui.RadarModel.WINDOW_MS]), newest [RECENT_MAX] at most. */
+    private fun recentHistory(t: Track): List<Sample> {
+        val from = t.lastSeen - com.rfsentinel.app.ui.RadarModel.WINDOW_MS
+        val out = ArrayList<Sample>(minOf(RECENT_MAX, t.history.size))
+        val newestFirst = t.history.descendingIterator()
+        while (newestFirst.hasNext() && out.size < RECENT_MAX) {
+            val s = newestFirst.next()
+            if (s.time < from) break
+            out += s
+        }
+        return out.asReversed()
+    }
+
     private fun snap(t: Track, full: Boolean) = Snapshot(
         mac = t.mac,
         source = t.advert?.source ?: Advert.Source.BLE,
@@ -484,7 +499,8 @@ object DeviceRegistry {
         following = t.following,
         known = t.known,
         advert = if (full) t.advert else null,
-        history = if (full) t.history.toList() else emptyList(),
+        // Light snapshots carry only the last few readings: enough for the radar's trail and trend, cheap every second.
+        history = if (full) t.history.toList() else recentHistory(t),
         path = if (full) t.path.toList() else emptyList(),
         bestPosition = t.bestPosition,
         located = t.located,

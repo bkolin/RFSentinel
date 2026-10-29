@@ -115,6 +115,10 @@
             android:exported="false"
             android:parentActivityName=".MainActivity" />
         <activity
+            android:name=".ui.TacticalActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
+        <activity
             android:name=".nav.NavSearchActivity"
             android:exported="false"
             android:windowSoftInputMode="stateVisible|adjustResize" />

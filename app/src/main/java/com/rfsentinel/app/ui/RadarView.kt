@@ -49,6 +49,10 @@ class RadarView @JvmOverloads constructor(
     var angleLayout: Layout = Layout.SPREAD
         set(value) { field = value; invalidate() }
 
+    /** Without the legend row and the caption, for a screen that shows its own (the Tactical view). */
+    var compact = false
+        set(value) { field = value; invalidate() }
+
     private var blips: List<Blip> = emptyList()
     private var totals: Map<Kind, Int> = emptyMap()
     private val hidden = mutableSetOf<Kind>()
@@ -89,8 +93,8 @@ class RadarView @JvmOverloads constructor(
     private val legendHits = mutableMapOf<Kind, RectF>()
     private val layoutChip = RectF()
 
-    private val legendH get() = 24 * density
-    private val captionH get() = 28 * density
+    private val legendH get() = if (compact) 0f else 24 * density
+    private val captionH get() = if (compact) 4 * density else 28 * density
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -198,8 +202,10 @@ class RadarView @JvmOverloads constructor(
         }
         canvas.drawCircle(cx, cy, 5 * density, youPaint)
 
-        drawLegend(canvas)
-        canvas.drawText(RadarModel.caption(angleLayout), 8 * density, height - 8 * density, textPaint)
+        if (!compact) {
+            drawLegend(canvas)
+            canvas.drawText(RadarModel.caption(angleLayout), 8 * density, height - 8 * density, textPaint)
+        }
 
         sweep = (sweep + 2.4f) % 360f
         if (isShown) postInvalidateOnAnimation()
@@ -236,13 +242,13 @@ class RadarView @JvmOverloads constructor(
         if (event.action == MotionEvent.ACTION_DOWN) return true
         if (event.action == MotionEvent.ACTION_UP) {
             val slop = 6 * density
-            if (RectF(layoutChip).apply { inset(-slop, -slop) }.contains(event.x, event.y)) {
+            if (!compact && RectF(layoutChip).apply { inset(-slop, -slop) }.contains(event.x, event.y)) {
                 angleLayout = if (angleLayout == Layout.SPREAD) Layout.APPROACH else Layout.SPREAD
                 onLayoutChanged?.invoke(angleLayout)
                 performClick()
                 return true
             }
-            legendHits.entries.firstOrNull { it.value.contains(event.x, event.y) }?.let { (kind, _) ->
+            if (!compact) legendHits.entries.firstOrNull { it.value.contains(event.x, event.y) }?.let { (kind, _) ->
                 if (!hidden.remove(kind)) hidden += kind
                 invalidate()
                 performClick()
