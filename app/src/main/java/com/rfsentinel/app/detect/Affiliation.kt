@@ -6,26 +6,34 @@ import com.rfsentinel.app.oui.OuiEntry
  * Who a device most likely belongs to, as the Tactical view sorts and colours it: alongside [Category], which says
  * what the equipment IS. A body camera and a squad-car router are both police kit to most people, but a cellular
  * router alone is also on ambulances, buses and utility trucks - so routers are [FLEET], and only equipment that is
- * police-specific is [PRIORITY].
+ * police-specific is [PRIORITY]. A router travelling with EMS or fire equipment, or named like an ambulance or fire
+ * engine, is [EMERGENCY].
  *
- * This is a reading of the evidence, never proof of who operates a device (see [classify]).
+ * This is a reading of the evidence, never proof of who operates a device (see [read]).
  */
 enum class Affiliation(val title: String, val detail: String, val colorArgb: Int, val rank: Int) {
-    /** Law-enforcement / public-safety equipment: body cams, plate readers, police-only gear. */
-    PRIORITY("Priority", "LE / Public Safety", 0xFFFF3B6B.toInt(), 0),
+    /** Law-enforcement equipment: body cams, plate readers, police-only gear. */
+    PRIORITY("Priority", "LE / Public Safety", 0xFFFF2E88.toInt(), 0),
+    /** Fire and EMS: defibrillators and patient monitors, breathing-apparatus telemetry, and routers with them. */
+    EMERGENCY("Emergency", "EMS / Fire", 0xFFFF5A36.toInt(), 1),
     /** Something that could be aimed at you: trackers, camera glasses, drones, skimmers, hacking tools, hidden cameras. */
-    THREAT("Threat", "Tracker / Surveillance", 0xFFFF8A3D.toInt(), 1),
+    THREAT("Threat", "Tracker / Surveillance", 0xFFC77DFF.toInt(), 2),
     /** Matched one of your own watchlist rules. */
-    CUSTOM("Custom", "Your watchlist", 0xFFB98CFF.toInt(), 2),
-    /** Vehicle cellular routers and modems (Cradlepoint, Sierra Wireless, Inseego, Peplink, Digi...). */
-    FLEET("Fleet", "Cellular Router", 0xFFFFC845.toInt(), 3),
+    CUSTOM("Custom", "Your watchlist", 0xFF8C9EFF.toInt(), 3),
+    /** Vehicle cellular routers and fleet telematics (trucks, vans, buses, utility vehicles). */
+    FLEET("Fleet", "Cellular Router", 0xFFFFC845.toInt(), 4),
     /** Business access points, public hotspots, beacons and other infrastructure. */
-    COMMERCIAL("Commercial", "Infrastructure", 0xFF4FC3F7.toInt(), 4),
+    COMMERCIAL("Commercial", "Infrastructure", 0xFF4FC3F7.toInt(), 5),
     /** Everything else: home routers, phones, earbuds, TVs. */
-    RESIDENTIAL("Residential", "Consumer", 0xFF7BD88F.toInt(), 5);
+    RESIDENTIAL("Residential", "Consumer", 0xFF7BD88F.toInt(), 6);
 
     /** "Priority / LE / Public Safety". */
     val label get() = "$title / $detail"
+
+    /** An affiliation with the finer [detail] the evidence gave ("Telematics", "Transit"...), and why. */
+    data class Reading(val affiliation: Affiliation, val detail: String = affiliation.detail, val because: String? = null) {
+        val label get() = "${affiliation.title} / $detail"
+    }
 
     companion object {
         /** Detection categories that are police / public-safety equipment. */
@@ -34,70 +42,109 @@ enum class Affiliation(val title: String, val detail: String, val colorArgb: Int
             Category.CELL_ANOMALY, Category.AIRCRAFT
         )
 
+        private fun re(s: String) = Regex(s, RegexOption.IGNORE_CASE)
+
         /** Makers of vehicle cellular routers and modems (IEEE registrant / Bluetooth company names). */
-        private val FLEET_VENDOR = Regex(
-            "cradlepoint|sierra wireless|inseego|novatel|peplink|pepwave|digi international|digiboard|teltonika|" +
-                "multitech|multi-tech|semtech|airlink", RegexOption.IGNORE_CASE
-        )
+        private val FLEET_VENDOR = re("cradlepoint|sierra wireless|inseego|novatel|peplink|pepwave|digi international|digiboard|" +
+            "teltonika|multitech|multi-tech|semtech|airlink")
+        /**
+         * Fleet telematics and fleet dashcams (IEEE / Bluetooth SIG registrants): Samsara, Geotab, Motive (ex-KeepTruckin),
+         * Verizon Connect (ex-Fleetmatics), Omnitracs, CalAmp, Lytx. On trucks, vans and service vehicles.
+         */
+        private val TELEMATICS_VENDOR = re("samsara|geotab|motive technologies|keeptruckin|verizon connect|fleetmatics|omnitracs|calamp|lytx")
+        /** Transit-bus systems (Clever Devices) and school-bus / trucking telematics (Zonar Systems). */
+        private val TRANSIT_VENDOR = re("clever devices|zonar")
+        /**
+         * EMS and fire equipment makers (IEEE / Bluetooth SIG registrants): defibrillators and monitors (Stryker,
+         * Physio-Control - LIFEPAK, ZOLL, Philips cardiac and monitoring systems, Mindray), Dräger (medical and
+         * breathing apparatus) and MSA (breathing-apparatus telemetry).
+         */
+        private val EMS_VENDOR = re("stryker|physio-control|\\bzoll\\b|philips medical|mindray|draeger|dräger|msa innovation|mine safety")
+
         /** What a hit label or device type says about a router rather than a police-only device. */
-        private val ROUTER_WORDS = Regex("router|modem|gateway|hotspot|cellular|in-vehicle|mobile hotspot", RegexOption.IGNORE_CASE)
-        /** Words that keep a router hit police-specific (an Axon Fleet SSID is police, a bare Cradlepoint isn't). */
-        private val POLICE_WORDS = Regex("\\bpolice\\b|\\bpd\\b|sheriff|axon|watchguard|motorola solutions|getac|body ?cam|patrol|squad|\\ble\\b",
-            RegexOption.IGNORE_CASE)
+        private val ROUTER_WORDS = re("router|modem|gateway|hotspot|cellular|in-vehicle|mobile hotspot")
+        /**
+         * Police-specific makers and products: these keep a router match Priority (an Axon Fleet SSID is police kit).
+         * "Possible police vehicle" alone is not enough: the same routers are on ambulances and buses.
+         */
+        private val POLICE_SPECIFIC = re("axon|watchguard|motorola solutions|getac|body ?cam|sheriff|\\bpolice (car|cruiser|unit)\\b")
+        /**
+         * Unit names agencies give fire and EMS vehicles' networks: MEDIC 12, AMB-3, ENGINE41, LADDER 2, RESCUE-1, EMS...
+         * Not "squad" or "unit": police use those too.
+         */
+        private val EMS_NAME = re("\\b(medic|amb|ambulance|ems|engine|ladder|rescue|battalion|fire|fd)[ _-]?\\d|\\bambulance\\b|\\bems\\b|\\bfire ?dept|\\bamr\\b")
+        /** Bus and transit network names. */
+        private val TRANSIT_NAME = re("\\b(bus|transit|metro|coach)\\b|^bus[ _-]?\\d")
 
         /** Device types (from [DeviceIntel]) that are infrastructure rather than a person's own device. */
-        private val COMMERCIAL_TYPE = Regex(
+        private val COMMERCIAL_TYPE = re(
             "^business (access point|wifi)|^public wifi hotspot|^open wifi|^train wifi|beacon|eddystone|ibeacon|" +
-                "printer|point of sale|payment|^pos\\b|scale|digital signage|^sensor|gateway|access control|parking",
-            RegexOption.IGNORE_CASE
+                "printer|point of sale|payment|^pos\\b|scale|digital signage|^sensor|gateway|access control|parking"
         )
         /** Enterprise WiFi makers: their access points are in offices, shops, schools and hotels, rarely homes. */
-        private val COMMERCIAL_VENDOR = Regex(
+        private val COMMERCIAL_VENDOR = re(
             "cisco|meraki|aruba|hewlett packard enterprise|ruckus|commscope|juniper|mist systems|extreme networks|aerohive|" +
-                "fortinet|cambium|ubiquiti|zebra|honeywell|siemens|axis communications|hanwha|hikvision|dahua",
-            RegexOption.IGNORE_CASE
+                "fortinet|cambium|ubiquiti|zebra|honeywell|siemens|axis communications|hanwha|hikvision|dahua"
         )
         /** Network names that announce a business or public network. */
-        private val COMMERCIAL_SSID = Regex(
+        private val COMMERCIAL_SSID = re(
             "guest|public|free|corp|office|staff|employee|xfinitywifi|attwifi|spectrum ?wifi|optimumwifi|cablewifi|" +
-                "starbucks|mcdonald|walmart|target|hotel|airport|library|school|hospital|_pos\\b|-pos\\b",
-            RegexOption.IGNORE_CASE
+                "starbucks|mcdonald|walmart|target|hotel|airport|library|school|hospital|_pos\\b|-pos\\b"
         )
+
+        /** Whether [vendor] makes EMS / fire equipment: such a device heard next to a router makes the router [EMERGENCY]. */
+        fun isEmsVendor(vendor: String?) = vendor != null && EMS_VENDOR.containsMatchIn(vendor)
+
+        fun classify(best: Hit?, vendor: String?, deviceType: String?, name: String?, nearbyEms: String? = null): Affiliation =
+            read(best, vendor, deviceType, name, nearbyEms).affiliation
 
         /**
          * The affiliation of a device from what is known about it: its strongest detection [best] (null when nothing
-         * flagged it), the maker [vendor], the [deviceType] [DeviceIntel] gave it and its advertised [name] / SSID.
-         * Strongest evidence first: your own rules, then police categories, then threats, then the maker and name.
+         * flagged it), the maker [vendor], the [deviceType] [DeviceIntel] gave it, its advertised [name] / SSID, and
+         * [nearbyEms]: the maker of EMS / fire equipment heard right beside it (same moment, about the same signal),
+         * if any. Strongest evidence first: your own rules, police kit, threats, then the maker and name.
          */
-        fun classify(best: Hit?, vendor: String?, deviceType: String?, name: String?): Affiliation {
+        fun read(best: Hit?, vendor: String?, deviceType: String?, name: String?, nearbyEms: String? = null): Reading {
             val v = vendor.orEmpty()
             val type = deviceType.orEmpty()
             if (best != null) {
-                if (best.source == OuiEntry.YOURS || best.category == Category.CUSTOM) return CUSTOM
+                if (best.source == OuiEntry.YOURS || best.category == Category.CUSTOM) return Reading(CUSTOM)
                 if (best.category in PRIORITY_CATEGORIES) {
-                    // A public-safety match that is only a router (by its label or maker) is fleet gear, unless
-                    // something in it is police-specific.
+                    // A public-safety match that is only a router (by its label or maker) is a vehicle router: whose
+                    // vehicle is read from its name and the equipment beside it, like an unflagged one.
                     val routerOnly = (ROUTER_WORDS.containsMatchIn(best.label) || FLEET_VENDOR.containsMatchIn(v)) &&
-                        best.category == Category.PUBLIC_SAFETY && !POLICE_WORDS.containsMatchIn(best.label)
-                    return if (routerOnly) FLEET else PRIORITY
+                        best.category == Category.PUBLIC_SAFETY && !POLICE_SPECIFIC.containsMatchIn(best.label)
+                    return if (routerOnly) vehicle(name, nearbyEms, null) else Reading(PRIORITY)
                 }
-                return THREAT
+                return Reading(THREAT)
             }
-            if (FLEET_VENDOR.containsMatchIn(v)) return FLEET
+            if (isEmsVendor(v)) return Reading(EMERGENCY, "EMS / Fire equipment")
+            if (FLEET_VENDOR.containsMatchIn(v)) return vehicle(name, nearbyEms, null)
+            if (TELEMATICS_VENDOR.containsMatchIn(v)) return Reading(FLEET, "Telematics")
+            if (TRANSIT_VENDOR.containsMatchIn(v)) return Reading(FLEET, "Transit / School bus")
             if (COMMERCIAL_TYPE.containsMatchIn(type) || COMMERCIAL_VENDOR.containsMatchIn(v) ||
-                name?.let { COMMERCIAL_SSID.containsMatchIn(it) } == true) return COMMERCIAL
-            return RESIDENTIAL
+                name?.let { COMMERCIAL_SSID.containsMatchIn(it) } == true) return Reading(COMMERCIAL)
+            return Reading(RESIDENTIAL)
+        }
+
+        /** A vehicle's router: Emergency when its name or the equipment beside it says so, a bus by its name, else Fleet. */
+        private fun vehicle(name: String?, nearbyEms: String?, fallback: String?): Reading = when {
+            name != null && EMS_NAME.containsMatchIn(name) -> Reading(EMERGENCY, "EMS / Fire vehicle", "network named \"$name\"")
+            nearbyEms != null -> Reading(EMERGENCY, "EMS / Fire vehicle", "$nearbyEms equipment beside it")
+            name != null && TRANSIT_NAME.containsMatchIn(name) -> Reading(FLEET, "Transit / Bus", "network named \"$name\"")
+            else -> Reading(FLEET, fallback ?: FLEET.detail)
         }
 
         /**
          * The category line of a Tactical entry: "Priority / LE / Public Safety · Axon body camera",
-         * "Threat / Apple AirTag", "Fleet / Cellular Router · Cradlepoint", "Residential / Consumer · Apple".
+         * "Emergency / EMS / Fire vehicle · ZOLL equipment beside it", "Fleet / Telematics · Samsara".
          */
-        fun describe(a: Affiliation, best: Hit?, vendor: String?): String = when {
-            best != null && (a == PRIORITY || a == FLEET) -> "${a.label} · ${best.label}"
-            best != null -> "${a.title} / ${best.label}"
-            !vendor.isNullOrBlank() -> "${a.label} · ${vendor.take(28)}"
-            else -> a.label
+        fun describe(r: Reading, best: Hit?, vendor: String?): String = when {
+            r.because != null -> "${r.label} · ${r.because}"
+            best != null && (r.affiliation == PRIORITY || r.affiliation == FLEET) -> "${r.label} · ${best.label}"
+            best != null -> "${r.affiliation.title} / ${best.label}"
+            !vendor.isNullOrBlank() -> "${r.label} · ${vendor.take(28)}"
+            else -> r.label
         }
     }
 }

@@ -63,4 +63,17 @@ class TacticalModelTest {
         val c = TacticalModel.counts(listOf(dev("A", -50, vendor = "NETGEAR"), dev("B", -50, vendor = "Cradlepoint"), dev("C", -50, vendor = "NETGEAR")))
         assertEquals(listOf(Affiliation.FLEET to 1, Affiliation.RESIDENTIAL to 2), c.toList())
     }
+
+    @Test
+    fun aRouterBesideADefibrillatorIsEmergency() {
+        val router = dev("00:30:44:00:00:01", -60, vendor = "Cradlepoint, Inc")
+        val lifepak = dev("40:BD:9E:00:00:01", -66, wifi = false, vendor = "Physio-Control, Inc")
+        val farRouter = dev("00:30:44:00:00:02", -90, vendor = "Cradlepoint, Inc")
+        val out = TacticalModel.withNearbyEms(listOf(router, lifepak, farRouter)).associateBy { it.mac }
+        assertEquals(Affiliation.EMERGENCY, out.getValue(router.mac).affiliation)
+        assertEquals("Physio-Control", out.getValue(router.mac).nearbyEms)
+        assertEquals(Affiliation.EMERGENCY, out.getValue(lifepak.mac).affiliation)
+        assertEquals("too faint to be in the same vehicle", Affiliation.FLEET, out.getValue(farRouter.mac).affiliation)
+        assertEquals("nothing beside it", Affiliation.FLEET, TacticalModel.withNearbyEms(listOf(router)).single().affiliation)
+    }
 }

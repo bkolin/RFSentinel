@@ -212,9 +212,9 @@ class TacticalActivity : AppCompatActivity() {
         handler.postDelayed({ render() }, 400)
     }
 
-    private fun device(s: DeviceRegistry.Snapshot, full: DeviceRegistry.Snapshot? = null) = TacticalModel.Device(
+    private fun device(s: DeviceRegistry.Snapshot) = TacticalModel.Device(
         mac = s.mac, wifi = s.source == Advert.Source.WIFI, name = s.name, vendor = s.vendor, deviceType = s.deviceType,
-        best = s.best, rssi = s.rssi, frequencyMhz = full?.advert?.wifi?.frequencyMhz,
+        best = s.best, rssi = s.rssi, frequencyMhz = null,
         firstSeen = s.firstSeen, lastSeen = s.lastSeen,
     )
 
@@ -226,7 +226,7 @@ class TacticalActivity : AppCompatActivity() {
         val externalMs = Prefs.liveExternalSec(this) * 1000L
         val all = DeviceRegistry.snapshot(now).filter { LiveWindow.keep(it, now, bleMs, wifiMs, externalMs) }
         val (wifiSnaps, bleSnaps) = all.partition { it.source == Advert.Source.WIFI }
-        val devices = all.associate { it.mac to device(it) }
+        val devices = TacticalModel.withNearbyEms(all.map { device(it) }).associateBy { it.mac }
 
         status.text = buildString {
             append(if (running) "SCAN: ACTIVE" else "SCAN: STOPPED")
@@ -264,7 +264,7 @@ class TacticalActivity : AppCompatActivity() {
         // WI-FI: the most important networks first.
         val wifiSorted = TacticalModel.sorted(wifiSnaps.map { devices.getValue(it.mac) })
         val wifiShown = wifiSorted.take(if (wifiExpanded) LONG else WIFI_SHORT)
-        fill(wifiList, wifiShown.map { d -> device(all.first { it.mac == d.mac }, DeviceRegistry.get(d.mac)) }, now,
+        fill(wifiList, wifiShown.map { d -> d.copy(frequencyMhz = DeviceRegistry.get(d.mac)?.advert?.wifi?.frequencyMhz) }, now,
             empty = if (running) "Listening... no WiFi networks heard yet." else "Scan stopped.")
         wifiShowing.text = TacticalModel.showing(wifiShown.size, wifiSorted.size)
         wifiMore.text = if (wifiExpanded) "SHOW LESS" else "SHOW ALL WI-FI"
