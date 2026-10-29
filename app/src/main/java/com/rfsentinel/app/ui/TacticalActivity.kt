@@ -143,6 +143,7 @@ class TacticalActivity : AppCompatActivity() {
         })
         radar = RadarView(this).apply {
             compact = true
+            setScopeColors(CYAN, DIM)
             angleLayout = if (Prefs.radarApproach(this@TacticalActivity)) RadarModel.Layout.APPROACH else RadarModel.Layout.SPREAD
             onBlipClick = { DeviceActions.openDetails(this@TacticalActivity, it) }
         }

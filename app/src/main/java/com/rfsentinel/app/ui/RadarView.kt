@@ -85,8 +85,21 @@ class RadarView @JvmOverloads constructor(
     private val pulsePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2f * density }
     private val sweepPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val youPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = you }
-    private val ordinaryColor = scope
-    private val sweepColor = alpha(scope, 0x55)
+    private var textColor = scopeText
+    private var ordinaryColor = scope
+    private var sweepColor = alpha(scope, 0x55)
+
+    /** Rings, text and sweep in [ring] / [text] instead of the theme's scope colours (the Tactical view's palette). */
+    fun setScopeColors(ring: Int, text: Int) {
+        ringPaint.color = alpha(ring, 0x66)
+        textPaint.color = text
+        textColor = text
+        chipPaint.color = alpha(ring, 0x99)
+        ordinaryColor = ring
+        sweepColor = alpha(ring, 0x55)
+        if (width > 0) onSizeChanged(width, height, width, height)
+        invalidate()
+    }
     private val shape = Path()
 
     /** Tap targets of the legend, laid out by [onDraw]. */
@@ -227,7 +240,7 @@ class RadarView @JvmOverloads constructor(
             if (off) textPaint.alpha = 0x50
             val text = "${kind.label} $n"
             canvas.drawText(text, x, y, textPaint)
-            textPaint.color = scopeText
+            textPaint.color = textColor
             x += textPaint.measureText(text) + 14 * density
             legendHits[kind] = RectF(start - 4 * density, 0f, x - 6 * density, legendH)
         }
