@@ -490,6 +490,10 @@ object Prefs {
     fun radarBeep(context: Context): Boolean = bool(context, "radar_beep", false)
     fun setRadarBeep(context: Context, value: Boolean) = setBool(context, "radar_beep", value)
 
+    /** The radar's angle layout: false = spread by address, true = rising signals at the top ([com.rfsentinel.app.ui.RadarModel]). */
+    fun radarApproach(context: Context): Boolean = bool(context, "radar_approach", false)
+    fun setRadarApproach(context: Context, value: Boolean) = setBool(context, "radar_approach", value)
+
     /** Radar-detector sound style: Ka / K / X style tones, startup sweep, "GPS connected", short voice. */
     fun detectorSound(context: Context): Boolean = bool(context, "detector_sound", false)
     fun setDetectorSound(context: Context, value: Boolean) = setBool(context, "detector_sound", value)

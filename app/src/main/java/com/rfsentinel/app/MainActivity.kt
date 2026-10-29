@@ -28,6 +28,7 @@ import com.rfsentinel.app.ui.DetectionLogActivity
 import com.rfsentinel.app.ui.DeviceActions
 import com.rfsentinel.app.ui.DeviceAdapter
 import com.rfsentinel.app.ui.DeviceRow
+import com.rfsentinel.app.ui.RadarModel
 import com.rfsentinel.app.ui.RadarView
 import com.rfsentinel.app.util.Exporter
 import com.rfsentinel.app.util.Permissions
@@ -178,6 +179,8 @@ class MainActivity : AppCompatActivity() {
         // Rows rebind every second (RSSI / "seen Xs ago"); the default change
         // crossfade would make the whole list flicker and fight the match flash.
         (binding.recyclerView.itemAnimator as? SimpleItemAnimator)?.supportsChangeAnimations = false
+        binding.radarView.angleLayout = if (Prefs.radarApproach(this)) RadarModel.Layout.APPROACH else RadarModel.Layout.SPREAD
+        binding.radarView.onLayoutChanged = { Prefs.setRadarApproach(this, it == RadarModel.Layout.APPROACH) }
         binding.radarView.onBlipClick = {
             if (it.startsWith(RADIO_ROW)) startActivity(Intent(this, com.rfsentinel.app.ui.DetectionLogActivity::class.java))
             else DeviceActions.openDetails(this, it)
@@ -727,15 +730,21 @@ class MainActivity : AppCompatActivity() {
         if (panes.radarShown) {
             val radio = radioBlips(now, threshold)
             radioBlips = radio.size
+            fun kindOf(s: DeviceRegistry.Snapshot) =
+                if (s.source == com.rfsentinel.app.detect.Advert.Source.WIFI) RadarModel.Kind.WIFI else RadarModel.Kind.BLE
+            val totals = visible.groupingBy { kindOf(it) }.eachCount() + (RadarModel.Kind.RADIO to radio.size)
             binding.radarView.setBlips(visible.take(200).map { s ->
                 val alert = com.rfsentinel.app.ui.LiveWindow.alerting(s, now)
                 RadarView.Blip(
                     s.mac, s.rssi,
                     if (alert) colorFor(s) else binding.radarView.ordinaryColor(),
                     alert,
-                    if (alert) s.best?.label else null
+                    if (alert) s.best?.label else null,
+                    kind = kindOf(s),
+                    trail = RadarModel.trail(s.history, now),
+                    motion = RadarModel.motion(RadarModel.slopeDbPerMin(s.history, now)),
                 )
-            } + radio)
+            } + radio, totals)
         }
         if (panes.listShown) {
             val cells = cellRows(now)
@@ -897,7 +906,7 @@ class MainActivity : AppCompatActivity() {
                 val alert = now - r.lastSeen <= RADIO_LIVE_MS && r.confidence >= threshold
                 // Signal above the noise as a stand-in RSSI: 40 dB lands in Near, 30 dB in Nearby (as the alert wording).
                 RadarView.Blip(RADIO_ROW + r.freqHz, (-115 + r.snrDb * 3 / 2).coerceIn(-100, -30), color, alert,
-                    if (alert) "${r.mhz} MHz" + (r.name?.let { " $it" } ?: "") else null)
+                    if (alert) "${r.mhz} MHz" + (r.name?.let { " $it" } ?: "") else null, kind = RadarModel.Kind.RADIO)
             }
     }
 
