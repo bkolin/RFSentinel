@@ -76,19 +76,27 @@ enum class Affiliation(val title: String, val detail: String, val colorArgb: Int
         /** Bus and transit network names. */
         private val TRANSIT_NAME = re("\\b(bus|transit|metro|coach)\\b|^bus[ _-]?\\d")
 
-        /** Device types (from [DeviceIntel]) that are infrastructure rather than a person's own device. */
+        /**
+         * Device types (from [DeviceIntel]) that are business infrastructure. Not beacons, sensors or gateways: phones,
+         * earbuds and home ISP gateways advertise as those too.
+         */
         private val COMMERCIAL_TYPE = re(
-            "^business (access point|wifi)|^public wifi hotspot|^open wifi|^train wifi|beacon|eddystone|ibeacon|" +
-                "printer|point of sale|payment|^pos\\b|scale|digital signage|^sensor|gateway|access control|parking"
+            "^business (access point|wifi)|^public wifi hotspot|^open wifi|^train wifi|printer|point of sale|payment|^pos\\b|digital signage"
         )
-        /** Enterprise WiFi makers: their access points are in offices, shops, schools and hotels, rarely homes. */
+        /**
+         * Enterprise WiFi makers: their access points are in offices, shops, schools and hotels, rarely homes. Not makers
+         * that also sell home gear (CommScope / Arris cable modems, Ubiquiti, Honeywell and Siemens thermostats).
+         */
         private val COMMERCIAL_VENDOR = re(
-            "cisco|meraki|aruba|hewlett packard enterprise|ruckus|commscope|juniper|mist systems|extreme networks|aerohive|" +
-                "fortinet|cambium|ubiquiti|zebra|honeywell|siemens|axis communications|hanwha|hikvision|dahua"
+            "cisco|meraki|aruba|hewlett packard enterprise|ruckus|juniper|mist systems|extreme networks|aerohive|" +
+                "fortinet|cambium|zebra|axis communications|hanwha|hikvision|dahua"
         )
-        /** Network names that announce a business or public network. */
+        /**
+         * Network names that announce a business or public network. Not "guest": home routers make "<name>-guest"
+         * networks.
+         */
         private val COMMERCIAL_SSID = re(
-            "guest|public|free|corp|office|staff|employee|xfinitywifi|attwifi|spectrum ?wifi|optimumwifi|cablewifi|" +
+            "public|\\bfree\\b|corp|office|staff|employee|xfinitywifi|attwifi|spectrum ?wifi|optimumwifi|cablewifi|" +
                 "starbucks|mcdonald|walmart|target|hotel|airport|library|school|hospital|_pos\\b|-pos\\b"
         )
 

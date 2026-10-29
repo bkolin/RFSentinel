@@ -34,10 +34,19 @@ class AffiliationTest {
         assertEquals(Affiliation.COMMERCIAL, classify(null, "Cisco Meraki", "Router", "CorpNet"))
         assertEquals(Affiliation.COMMERCIAL, classify(null, "Some Vendor", "Business access point", "x"))
         assertEquals(Affiliation.COMMERCIAL, classify(null, null, "WiFi network", "Starbucks WiFi"))
-        assertEquals(Affiliation.COMMERCIAL, classify(null, null, "iBeacon", null))
+        assertEquals(Affiliation.COMMERCIAL, classify(null, null, "Point of sale terminal", null))
         assertEquals(Affiliation.RESIDENTIAL, classify(null, "NETGEAR", "Router", "NETGEAR42"))
         assertEquals(Affiliation.RESIDENTIAL, classify(null, "Apple, Inc.", "AirPods", null))
         assertEquals(Affiliation.RESIDENTIAL, classify(null, null, null, null))
+    }
+
+    @Test
+    fun homeGearIsNotCommercial() {
+        assertEquals("a home router's guest network", Affiliation.RESIDENTIAL, classify(null, null, "Router", "homex-guest"))
+        assertEquals("cable modem", Affiliation.RESIDENTIAL, classify(null, "CommScope", "Router", "Lord Voldemodem"))
+        assertEquals("phone beacon", Affiliation.RESIDENTIAL, classify(null, "Apple, Inc.", "iBeacon", null))
+        assertEquals("BLE sensor chip", Affiliation.RESIDENTIAL, classify(null, "Texas Instruments", "Sensor", "Sd644c177ca22ef4eC"))
+        assertEquals("ISP gateway", Affiliation.RESIDENTIAL, classify(null, null, "Gateway", "ATT-5G-1234"))
     }
 
     @Test
