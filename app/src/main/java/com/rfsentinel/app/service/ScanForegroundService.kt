@@ -171,6 +171,11 @@ class ScanForegroundService : Service() {
         /** The restarted-scan note was hidden by the user. */
         fun forgetWatchdogRestart() { lastWatchdogRestart = null }
 
+        /** When the phone's Bluetooth scan last delivered an advert (0: never this process), for the UI's status lines. */
+        @Volatile
+        var lastBleAdvertAt = 0L
+            private set
+
         /** True while an instance is alive in this process. Source of truth for the UI. */
         @Volatile
         var isRunning = false
@@ -312,6 +317,7 @@ class ScanForegroundService : Service() {
         bleEngine = BleScanEngine(this) { r ->
             val t = System.currentTimeMillis()
             lastBleResultAt = t
+            lastBleAdvertAt = t
             bleResults.incrementAndGet()
             bleWatchdogRestartAt?.let { onRecovered("Bluetooth", it, t); bleWatchdogRestartAt = null; bleSilenceMs = BLE_SILENCE_MS }
             // Another Sentinel's link advert: handled by Sentinel Link, not a device to list.

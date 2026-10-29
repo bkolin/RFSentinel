@@ -45,6 +45,9 @@ class TacticalActivity : AppCompatActivity() {
         @Volatile var dismissed = false
 
         private const val REFRESH_MS = 1_000L
+        private const val NOTE_MS = 4_000L
+        /** No advert for this long while Bluetooth scanning is on: say it is waiting rather than claim it hears things. */
+        private const val ADVERT_STALE_MS = 10_000L
         private const val WIFI_SHORT = 5
         /** BLE devices listed under "Show BLE details", most important first. */
         private const val BLE_DETAILS = 25
@@ -87,6 +90,11 @@ class TacticalActivity : AppCompatActivity() {
     private lateinit var bleList: LinearLayout
     private lateinit var bleShowing: TextView
     private lateinit var bleDetailsButton: TextView
+    private lateinit var bleStartButton: TextView
+    private lateinit var bleStopButton: TextView
+    /** A short note under the BLE buttons saying what a tap did; cleared after [NOTE_MS]. */
+    private lateinit var bleNote: TextView
+    private val clearNote = Runnable { bleNote.visibility = View.GONE }
     private var wifiExpanded = false
     private var bleDetails = false
 
@@ -161,10 +169,14 @@ class TacticalActivity : AppCompatActivity() {
 
         // BLE
         val bleCard = card(column, "BLE")
-        bleCard.addView(button("START BLE") { setBle(true) }, margins(top = 2))
-        bleCard.addView(button("STOP BLE") { setBle(false) }, margins(top = 6))
+        bleStartButton = button("START BLE") { setBle(true) }
+        bleCard.addView(bleStartButton, margins(top = 2))
+        bleStopButton = button("STOP BLE") { setBle(false) }
+        bleCard.addView(bleStopButton, margins(top = 6))
         bleDetailsButton = button("") { bleDetails = !bleDetails; render() }
         bleCard.addView(bleDetailsButton, margins(top = 6))
+        bleNote = text("", 12f, CYAN, bold = true).apply { visibility = View.GONE }
+        bleCard.addView(bleNote, margins(top = 8))
         bleStatus = text("", 12f, INK).also { bleCard.addView(it, margins(top = 8)) }
         bleList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         bleCard.addView(bleList, margins(top = 4))
@@ -205,11 +217,33 @@ class TacticalActivity : AppCompatActivity() {
         handler.postDelayed({ render() }, 400)
     }
 
-    /** The Bluetooth half of the scan on or off: the same switch as Settings > Scanning, applied live. */
+    /**
+     * The Bluetooth half of the scan on or off: the same switch as Settings > Scanning, applied live. START BLE also
+     * starts the scanner when it is stopped, so the button always does what it says.
+     */
     private fun setBle(on: Boolean) {
+        val running = ScanForegroundService.isRunning
+        val wasOn = running && Prefs.bleEnabled(this)
         Prefs.setBleEnabled(this, on)
-        if (ScanForegroundService.isRunning) ScanForegroundService.start(this)
+        note(when {
+            on && wasOn -> "Bluetooth scan is already on."
+            on && !running -> "Starting the scan with Bluetooth..."
+            on -> "Bluetooth scan on."
+            !wasOn -> "Bluetooth scan is already off."
+            else -> "Bluetooth scan off. WiFi keeps scanning."
+        })
+        when {
+            on && !running -> toggleScan()
+            running -> ScanForegroundService.start(this) // re-reads the setting and applies it
+        }
         handler.postDelayed({ render() }, 400)
+    }
+
+    private fun note(text: String) {
+        bleNote.text = text
+        bleNote.visibility = View.VISIBLE
+        handler.removeCallbacks(clearNote)
+        handler.postDelayed(clearNote, NOTE_MS)
     }
 
     private fun device(s: DeviceRegistry.Snapshot) = TacticalModel.Device(
@@ -273,12 +307,20 @@ class TacticalActivity : AppCompatActivity() {
         // BLE: the switch, a summary, and the devices when asked for.
         val bleOn = running && Prefs.bleEnabled(this)
         val bleSorted = TacticalModel.sorted(bleSnaps.map { devices.getValue(it.mac) })
+        val lastAdvert = ScanForegroundService.lastBleAdvertAt
         bleStatus.text = SpannableStringBuilder("BLE status: ").apply {
             val on = if (bleOn) "ON" else "OFF"
             append(on, ForegroundColorSpan(if (bleOn) 0xFF7BD88F.toInt() else MAGENTA), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            if (bleOn) append(
+                if (lastAdvert > 0 && now - lastAdvert < ADVERT_STALE_MS) " · last advert ${TacticalModel.ago(now, lastAdvert)}"
+                else " · waiting for adverts"
+            )
             append("\nBLE devices: ${bleSorted.size}")
-            if (!bleOn) append("\nBLE is optional. Start it when you want.")
+            if (!bleOn) append(if (running) "\nBLE is optional. Start it when you want." else "\nThe scan is stopped: START BLE starts it.")
         }
+        // The button that would change nothing right now sits back.
+        bleStartButton.alpha = if (bleOn) 0.45f else 1f
+        bleStopButton.alpha = if (bleOn) 1f else 0.45f
         bleDetailsButton.text = if (bleDetails) "HIDE BLE DETAILS" else "SHOW BLE DETAILS"
         if (bleDetails) {
             val shown = bleSorted.take(BLE_DETAILS)
@@ -355,6 +397,12 @@ class TacticalActivity : AppCompatActivity() {
             cornerRadius = dp(4).toFloat()
         }
         isClickable = true
+        isFocusable = true
+        // The system's press ripple over the flat colour, so a tap always shows.
+        foreground = android.util.TypedValue().let { tv ->
+            theme.resolveAttribute(android.R.attr.selectableItemBackground, tv, true)
+            androidx.core.content.ContextCompat.getDrawable(this@TacticalActivity, tv.resourceId)
+        }
         setOnClickListener { onClick() }
     }
 
