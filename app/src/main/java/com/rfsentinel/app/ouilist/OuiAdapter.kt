@@ -35,6 +35,8 @@ class OuiAdapter(
         holder.binding.prefixText.text = when {
             item.isNameRule -> "Name contains \"${item.ruleText}\""
             item.isStartsRule -> "Name starts with \"${item.ruleText}\""
+            item.isExactRule -> "Name is exactly \"${item.ruleText}\""
+            item.isPatternRule -> "Name matches /${item.prefix.substringAfter(':')}/"
             item.isVendorRule -> "Maker contains \"${item.ruleText}\""
             item.isProbeRule -> "Asks for network \"${item.ruleText}\""
             item.isFingerprintRule -> "Probe fingerprint ${item.ruleText}"

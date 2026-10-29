@@ -14,7 +14,7 @@ import java.io.InputStreamReader
 /**
  * The editable watchlist: bundled regional preset JSON assets plus user-added
  * custom entries (SharedPreferences). Entries match by MAC prefix, exact MAC,
- * name substring or manufacturer substring (see [OuiEntry.prefix]).
+ * name substring / start / exact name / pattern, or manufacturer substring (see [OuiEntry.prefix]).
  *
  * Matching runs on scanner threads while [load] may run on the UI thread, so
  * the lookup state is rebuilt off to the side and swapped in atomically.
@@ -35,6 +35,9 @@ object OuiWatchlist {
         val nameRules: List<OuiEntry>,
         /** Name / SSID prefix rules. */
         val startsRules: List<OuiEntry>,
+        /** Exact name / SSID rules keyed by the lower-cased name. */
+        val exactRules: Map<String, List<OuiEntry>>,
+        val patternRules: List<Pair<OuiEntry, NamePattern>>,
         val vendorRules: List<OuiEntry>,
         /** Requested-network rules keyed by the lower-cased network name. */
         val probeRules: Map<String, OuiEntry>,
@@ -58,7 +61,7 @@ object OuiWatchlist {
         private set
 
     @Volatile
-    private var state = State(emptyMap(), emptyList(), emptyList(), emptyList(), emptyMap(), emptyMap(), emptyMap(), emptyList())
+    private var state = State(emptyMap(), emptyList(), emptyList(), emptyMap(), emptyList(), emptyList(), emptyMap(), emptyMap(), emptyMap(), emptyList())
 
     /** Load order: regional presets after "global", so their labels win for shared prefixes. */
     val availablePresets = listOf("global", "canada", "us", "france", "uk", "portugal", "germany", "spain", "italy")
@@ -77,10 +80,11 @@ object OuiWatchlist {
         readCustom(context).forEach { byKey[it.prefix] = it }
         val all = byKey.values.toList()
         state = State(
-            byHex = all.filter { !it.isNameRule && !it.isStartsRule && !it.isVendorRule && !it.isProbeRule && !it.isFingerprintRule && !it.isAdvertRule }
-                .associateBy { MacUtil.hex(it.prefix) },
+            byHex = all.filter { !it.isTextRule }.associateBy { MacUtil.hex(it.prefix) },
             nameRules = all.filter { it.isNameRule && it.ruleText.isNotEmpty() },
             startsRules = all.filter { it.isStartsRule && it.ruleText.isNotEmpty() },
+            exactRules = all.filter { it.isExactRule && it.ruleText.isNotEmpty() }.groupBy { it.ruleText.lowercase() },
+            patternRules = all.filter { it.isPatternRule }.mapNotNull { e -> NamePattern.compile(e.prefix.substringAfter(':'))?.let { e to it } },
             vendorRules = all.filter { it.isVendorRule && it.ruleText.isNotEmpty() },
             probeRules = all.filter { it.isProbeRule && it.ruleText.isNotEmpty() }.associateBy { it.ruleText.lowercase() },
             fingerprintRules = all.filter { it.isFingerprintRule && it.ruleText.isNotEmpty() }.associateBy { it.ruleText.lowercase() },
@@ -118,6 +122,9 @@ object OuiWatchlist {
         return when {
             k.startsWith(OuiEntry.NAME, ignoreCase = true) -> OuiEntry.NAME + k.substringAfter(':').trim()
             k.startsWith(OuiEntry.STARTS, ignoreCase = true) -> OuiEntry.STARTS + k.substringAfter(':').trim()
+            k.startsWith(OuiEntry.EXACT, ignoreCase = true) -> OuiEntry.EXACT + k.substringAfter(':').trim()
+            // A pattern keeps its spaces: they are part of what it matches.
+            k.startsWith(OuiEntry.PATTERN, ignoreCase = true) -> OuiEntry.PATTERN + key.trimStart().substringAfter(':')
             k.startsWith(OuiEntry.VENDOR, ignoreCase = true) -> OuiEntry.VENDOR + k.substringAfter(':').trim()
             k.startsWith(OuiEntry.PROBE, ignoreCase = true) -> OuiEntry.PROBE + k.substringAfter(':').trim()
             k.startsWith(OuiEntry.FINGERPRINT, ignoreCase = true) -> OuiEntry.FINGERPRINT + k.substringAfter(':').trim().lowercase()
@@ -184,10 +191,14 @@ object OuiWatchlist {
 
     fun allEntries(): List<OuiEntry> = state.all
 
-    /** Valid keys: address prefix (24 to 44 bits), full MAC, or a non-empty name:/starts:/vendor:/probe:/fp:/adv: rule. */
+    /**
+     * Valid keys: address prefix (24 to 44 bits), full MAC, a non-empty name:/starts:/is:/vendor:/probe:/fp:/adv: rule,
+     * or a re: rule whose pattern compiles ([NamePattern]).
+     */
     fun isValidKey(prefix: String): Boolean {
         val k = prefix.trim()
-        if (k.startsWith(OuiEntry.NAME, true) || k.startsWith(OuiEntry.STARTS, true) || k.startsWith(OuiEntry.VENDOR, true) ||
+        if (k.startsWith(OuiEntry.PATTERN, true)) return NamePattern.compile(prefix.trimStart().substringAfter(':')) != null
+        if (k.startsWith(OuiEntry.NAME, true) || k.startsWith(OuiEntry.EXACT, true) || k.startsWith(OuiEntry.STARTS, true) || k.startsWith(OuiEntry.VENDOR, true) ||
             k.startsWith(OuiEntry.PROBE, true) || k.startsWith(OuiEntry.FINGERPRINT, true) || k.startsWith(OuiEntry.ADVERT, true)) {
             return k.substringAfter(':').isNotBlank()
         }
@@ -222,6 +233,10 @@ object OuiWatchlist {
                 .forEach { out += it.toHit("Name \"$name\" contains \"${it.ruleText}\"") }
             s.startsRules.filter { name.trimStart().startsWith(it.ruleText, ignoreCase = true) }
                 .forEach { out += it.toHit("Name \"$name\" starts with \"${it.ruleText}\"") }
+            s.exactRules[name.trim().lowercase()]
+                ?.forEach { out += it.toHit("Name is exactly \"${it.ruleText}\"") }
+            s.patternRules.filter { (_, p) -> p.matches(name) }
+                .forEach { (e, p) -> out += e.toHit("Name \"$name\" matches the pattern ${p.source}") }
         }
         if (vendors.isNotEmpty()) {
             s.vendorRules.forEach { rule ->

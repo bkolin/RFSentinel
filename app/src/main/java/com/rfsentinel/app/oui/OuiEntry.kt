@@ -12,6 +12,9 @@ data class OuiEntry(
      *  - "name:<text>"         advertised name / SSID contains <text> (case-insensitive)
      *  - "starts:<text>"       advertised name / SSID starts with <text> (case-insensitive), e.g. every
      *                          network named "Flock-..."
+     *  - "is:<text>"           advertised name / SSID is exactly <text> (case-insensitive)
+     *  - "re:<pattern>"        advertised name / SSID contains a match for the regular expression <pattern>
+     *                          (case-insensitive; see [NamePattern])
      *  - "vendor:<text>"       manufacturer (IEEE registrant or Bluetooth company) contains <text>
      *  - "probe:<ssid>"        a device asks for this exact WiFi network name (probe request,
      *                          heard by a USB WiFi adapter or an ESP32 Marauder board)
@@ -38,6 +41,11 @@ data class OuiEntry(
     val isCustom get() = confidence == "custom"
     val isNameRule get() = prefix.startsWith(NAME, ignoreCase = true)
     val isStartsRule get() = prefix.startsWith(STARTS, ignoreCase = true)
+    val isExactRule get() = prefix.startsWith(EXACT, ignoreCase = true)
+    val isPatternRule get() = prefix.startsWith(PATTERN, ignoreCase = true)
+    /** A rule on the name / SSID text rather than the address. */
+    val isTextRule get() = isNameRule || isStartsRule || isExactRule || isPatternRule || isVendorRule || isProbeRule ||
+        isFingerprintRule || isAdvertRule
     val isVendorRule get() = prefix.startsWith(VENDOR, ignoreCase = true)
     val isProbeRule get() = prefix.startsWith(PROBE, ignoreCase = true)
     val isFingerprintRule get() = prefix.startsWith(FINGERPRINT, ignoreCase = true)
@@ -67,6 +75,8 @@ data class OuiEntry(
         const val YOURS = "Your watchlist"
         const val NAME = "name:"
         const val STARTS = "starts:"
+        const val EXACT = "is:"
+        const val PATTERN = "re:"
         const val VENDOR = "vendor:"
         const val PROBE = "probe:"
         const val FINGERPRINT = "fp:"

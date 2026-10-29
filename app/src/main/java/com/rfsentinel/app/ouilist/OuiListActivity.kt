@@ -25,6 +25,8 @@ class OuiListActivity : AppCompatActivity() {
         ADDRESS("Address or vendor prefix", "Prefix AA:BB:CC or device AA:BB:CC:DD:EE:FF", ""),
         NAME("Name contains", "Text in the device name or WiFi SSID, e.g. Axon", OuiEntry.NAME),
         STARTS("Name starts with", "Start of the device name or WiFi SSID, e.g. Flock-", OuiEntry.STARTS),
+        EXACT("Name is exactly", "The whole device name or WiFi SSID, e.g. PD-UNIT-12", OuiEntry.EXACT),
+        PATTERN("Name matches pattern", "Regular expression, e.g. ^(AXON|AB3)-[0-9A-F]{4}$", OuiEntry.PATTERN),
         VENDOR("Maker contains", "Text in the manufacturer name, e.g. Motorola", OuiEntry.VENDOR),
         PROBE("Asks for network", "Exact WiFi network name a device asks for", OuiEntry.PROBE)
     }
@@ -71,12 +73,14 @@ class OuiListActivity : AppCompatActivity() {
         setRuleType(savedInstanceState?.getInt(STATE_RULE_TYPE)?.let { types.getOrNull(it) } ?: RuleType.ADDRESS)
 
         binding.addButton.setOnClickListener {
-            val text = binding.prefixInput.text.toString().trim()
+            // A pattern keeps its spaces: they are part of what it matches.
+            val text = binding.prefixInput.text.toString().let { if (ruleType == RuleType.PATTERN) it else it.trim() }
             val label = binding.labelInput.text.toString().trim()
             val key = ruleType.keyPrefix + text
             if (text.isEmpty() || !OuiWatchlist.isValidKey(key)) {
                 binding.prefixInput.error = when (ruleType) {
                     RuleType.ADDRESS -> "Format: AA:BB:CC up to AA:BB:CC:DD:EE:F for a prefix, AA:BB:CC:DD:EE:FF for one device"
+                    RuleType.PATTERN -> com.rfsentinel.app.oui.NamePattern.problem(text) ?: "Enter a pattern"
                     else -> "Enter some text to match"
                 }
             } else if (label.isEmpty()) {
